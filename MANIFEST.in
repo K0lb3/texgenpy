@@ -1,0 +1,3 @@
+include texgenpack/*.h
+include texgenpack/*.c
+include *.h *.pyx *.cpp
