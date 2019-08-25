@@ -20,7 +20,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <malloc.h>
+#ifndef __clang__
+# include <malloc.h>
+#endif
 #include <ctype.h>
 #include "texgenpack.h"
 #include "decode.h"

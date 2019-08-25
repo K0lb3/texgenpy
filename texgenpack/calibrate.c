@@ -20,7 +20,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
-#include <malloc.h>
+#ifndef __clang__
+# include <malloc.h>
+#endif
 #include <fgen.h>
 #include "texgenpack.h"
 
@@ -72,25 +74,6 @@ static void mutation_bin_report() {
 static void compress_callback(BlockUserData *user_data) {
 }
 
-static double calibrate_calculate_error(const Ffit *fit, const double *param) {
-	FitUserData *user_data = &fit_user_data;
-	Texture texture;
-	float crossover_prob = param[1];
-	if (fixed_crossover_probability)
-		crossover_prob = 0.7;
-	compress_image(user_data->image, user_data->texture_format, compress_callback, &texture, 1,
-		param[0], crossover_prob);
-	Image image2;
-	convert_texture_to_image(&texture, &image2);
-	double rmse = compare_images(user_data->image, &image2);
-	destroy_image(&image2);
-	destroy_texture(&texture);
-	printf("Mut = %.4lf, Cross = %.3lf, RMSE = %.3lf\n", param[0], crossover_prob, rmse);
-	fflush(stdout);
-	mutation_bin_add_measurement(param[0], rmse);
-	return rmse * rmse;
-}
-
 static void calibrate_generation_callback(Ffit *fit, int generation, const double *best_param, double best_error) {
 	float crossover_prob = best_param[1];
 	if (fixed_crossover_probability)
@@ -102,42 +85,3 @@ static void calibrate_generation_callback(Ffit *fit, int generation, const doubl
 	if (!deterministic)
 		ffit_signal_model_change(fit);
 }
-
-void calibrate_genetic_parameters(Image *image, int texture_type) {
-	option_deterministic = deterministic;	// Whether to initialize random function seed with timer.
-	option_quiet = 1;
-	mutation_bin_initialize();
-#if 0
-	Ffit *fit = ffit_create(2, calibrate_generation_callback, calibrate_calculate_error);
-	ffit_set_parameter_range_and_mapping(fit, 0, 0, 0.1, FFIT_MAPPING_LINEAR);	// Mutation rate.
-	ffit_set_parameter_range_and_mapping(fit, 1, 0, 0.9, FFIT_MAPPING_LINEAR);	// Crossover rate.
-	fit_user_data.image = image;
-	fit_user_data.texture_format = texture_type;
-	if (real_valued_ga)
-		ffit_run_fgen_real_valued(fit, 16, FGEN_ELITIST_SUS, 0.6, 0.4, 0.1);
-	else
-		ffit_run_fgen(fit, 16, 16, FGEN_ELITIST_SUS, fgen_crossover_uniform_per_element, 0.6, 0.05, 0.1);
-//		ffit_run_fgen(fit, 16, 32, FGEN_ELITIST_SUS, fgen_crossover_uniform_per_element, 0.6, 0.025, 0.1);
-#else
-	double mut = 0.005;
-	for (; mut < 0.050; mut += 0.001) {
-		int n = 2;
-		if (mut > 0.008 && mut <= 0.035)
-			n = 5;
-		for (int i = 0; i < n; i++) {
-			Texture texture;
-			compress_image(image, texture_type, compress_callback, &texture, 1, mut, 0.7);
-			Image image2;
-			convert_texture_to_image(&texture, &image2);
-			double rmse = compare_images(image, &image2);
-			destroy_image(&image2);
-			destroy_texture(&texture);
-			printf("Mut = %.4lf, Cross = %.3lf, RMSE = %.3lf\n", mut, 0.7, rmse);
-			fflush(stdout);
-			mutation_bin_add_measurement(mut, rmse);
-		}
-	}
-#endif
-	mutation_bin_report();
-}
-

@@ -21,7 +21,9 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <malloc.h>
+#ifndef __clang__
+# include <malloc.h>
+#endif
 #include "texgenpack.h"
 #include "decode.h"
 #ifndef __GNUC__
@@ -36,7 +38,6 @@ static int determine_filename_type(const char *filename);
 static void compare_files();
 static void decompress();
 static void compress();
-static void calibrate();
 
 // Variables reflecting command-line options.
 
@@ -459,24 +460,6 @@ int main(int argc, char **argv) {
 		decompress();
 		exit(0);
 	}
-	if (command == COMMAND_COMPRESS) {
-//		if ((source_filetype & FILE_TYPE_IMAGE_BIT) == 0) {
-//			printf("Error -- expected image file as first argument.\n");
-//			exit(1);
-//		}
-		if ((dest_filetype & FILE_TYPE_TEXTURE_BIT) == 0) {
-			printf("Error -- expected texture file as second argument.\n");
-			exit(1);
-		}
-		if (option_mipmaps && (dest_filetype & FILE_TYPE_MIPMAPS_BIT) == 0) {
-			printf("Error -- destination file type cannot hold multiple mipmap levels.\n");
-			exit(1);
-		}
-		compress();
-	}
-	if (command == COMMAND_CALIBRATE) {
-		calibrate();
-	}
 }
 
 static int file_exists(const char *filename) {
@@ -597,111 +580,3 @@ static void decompress() {
 	else
 		save_image(&image, dest_filename, dest_filetype);
 }
-
-static void compress_callback(BlockUserData *user_data) {
-	// Do nothing.
-}
-
-static void compress() {
-	Image image[32];
-	if (!option_quiet)
-		printf("Compressing %s to %s.\n", source_filename, dest_filename);
-	int nu_mipmaps;
-	if (source_filetype & FILE_TYPE_MIPMAPS_BIT)
-		nu_mipmaps = load_mipmap_images(source_filename, source_filetype, 32, &image[0]);
-	else {
-		load_image(source_filename, source_filetype, &image[0]);
-		nu_mipmaps = 1;
-	}
-	if (option_flip_vertical)
-		for (int i = 0; i < nu_mipmaps; i++)
-			flip_image_vertical(&image[i]);
-	int texture_type;
-	if (option_texture_format != - 1)
-		texture_type = option_texture_format;
-	else
-		// Set default compression format for the given the file type.
-		if (dest_filetype == FILE_TYPE_KTX || dest_filetype == FILE_TYPE_PKM)
-			texture_type = TEXTURE_TYPE_ETC1;
-		else
-		if (dest_filetype == FILE_TYPE_DDS)
-			texture_type = TEXTURE_TYPE_DXT1;
-	const char *texture_type_str = texture_type_text(texture_type);
-	if (!option_quiet) {
-		if (nu_mipmaps > 1)
-			printf("Number of mipmaps in source file: %d\n", nu_mipmaps);
-		printf("Target texture format: %s\n", texture_type_str);
-	}
-	// If there is only one mipmap in the source, and the --mipmaps option was given, generate mipmaps.
-	int generate_mipmaps = 0;
-	if (option_mipmaps && nu_mipmaps == 1) {
-		nu_mipmaps = count_mipmap_levels(&image[0]);
-		generate_mipmaps = 1;
-		if (!option_quiet)
-			printf("Generating %d mipmaps.\n", nu_mipmaps);
-	}
-	Texture *texture = (Texture *)alloca(sizeof(Texture) * nu_mipmaps);
-	Image *mipmap_image = (Image *)alloca(sizeof(Image) * nu_mipmaps);
-	if (generate_mipmaps) {
-		mipmap_image[0] = image[0];
-		if ((texture_type & TEXTURE_TYPE_SRGB_BIT) && nu_mipmaps > 1) {
-			// For sRGB textures, perform mipmapping after first converting to RGB and then convert the
-			// RGB mipmaps back to sRGB.
-			Image *rgb_mipmap_image = (Image *)alloca(sizeof(Image) * nu_mipmaps);
-			if (!option_quiet)
-				printf("Converting image from sRGB to RGB for mipmap generation.\n");
-			convert_image_from_srgb_to_rgb(&image[0], &rgb_mipmap_image[0]);
-			// Generate the mipmaps in RGB space.
-			for (int i = 1; i < nu_mipmaps; i++) {
-				generate_mipmap_level_from_previous_level(&rgb_mipmap_image[i - 1], &rgb_mipmap_image[i]);
-			}
-			// Convert them to sRGB
-			for (int i = 1; i < nu_mipmaps; i++) {
-				convert_image_from_rgb_to_srgb(&rgb_mipmap_image[i], &mipmap_image[i]);
-			}
-		}
-		else
-			for (int i = 1; i < nu_mipmaps; i++) {
-				generate_mipmap_level_from_previous_level(&mipmap_image[i - 1], &mipmap_image[i]);
-			}
-	}
-	else {
-		// The mipmaps are present in the source file.
-		for (int i = 0; i < nu_mipmaps; i++) {
-			mipmap_image[i] = image[i];
-			printf("Source mipmap %d: %d x %d\n", i, mipmap_image[i].width, mipmap_image[i].height);
-		}
-	}
-	for (int i = 0; i < nu_mipmaps; i++) {
-		// Compress the image into a texture.
-		if (!option_quiet)
-			printf("Mipmap level: %d (%d x %d)\n", i, mipmap_image[i].width, mipmap_image[i].height);
-		compress_image(&mipmap_image[i], texture_type, compress_callback, &texture[i], 0, 0, 0);
-		// Decompress the compressed texture and calculate the difference with the original.
-		Image compressed_image;
-		convert_texture_to_image(&texture[i], &compressed_image);
-		compare_images(&mipmap_image[i], &compressed_image);
-		destroy_image(&compressed_image);
-	}
-	// Save texture.
-	save_texture(&texture[0], nu_mipmaps, dest_filename, dest_filetype);
-}
-
-static void calibrate() {
-	Image image;
-	if (!option_quiet)
-		printf("Calibrating genetic parameters for compression of source file %s.\n", source_filename);
-	load_image(source_filename, source_filetype, &image);
-	int texture_type;
-	if (option_texture_format != - 1)
-		texture_type = option_texture_format;
-	else
-		// Set default compression format for the given the file type.
-		if (dest_filetype == FILE_TYPE_KTX || dest_filetype == FILE_TYPE_PKM)
-			texture_type = TEXTURE_TYPE_ETC1;
-		else
-		if (dest_filetype == FILE_TYPE_DDS)
-			texture_type = TEXTURE_TYPE_DXT1;
-	calibrate_genetic_parameters(&image, texture_type);	
-}
-

@@ -22,18 +22,14 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <string.h>
 #include <math.h>
 #include <float.h>
-#include <malloc.h>
+#ifndef __clang__
+# include <malloc.h>
+#endif
 #include "texgenpack.h"
 #include "decode.h"
 #include "packing.h"
 
 // Load image file or texture file. In the latter case, the texture is decoded into an image.
-
-void convert_stexture_to_simage(const char *filename, int filetype, const char *dstname) {
-	Image image;
-	load_image(filename, filetype, &image);
-	save_image(&image, dstname, FILE_TYPE_PNG);
-}
 
 void load_image(const char *filename, int filetype, Image *image) {
 	if (filetype == FILE_TYPE_ASTC) {
@@ -71,9 +67,6 @@ void load_image(const char *filename, int filetype, Image *image) {
 //		case FILE_TYPE_PPM :
 //			load_ppm_file(filename, image);
 //			break;
-		case FILE_TYPE_PNG :
-			load_png_file(filename, image);
-			break;
 		default :
 			printf("Error -- no support for loading image file format.\n");
 			exit(1);
@@ -128,9 +121,6 @@ void save_image(Image *image, const char *filename, int filetype) {
 //	case FILE_TYPE_PPM :
 //		load_ppm_file(filename, image);
 //		break;
-	case FILE_TYPE_PNG :
-		save_png_file(image, filename);
-		break;
 	default :
 		printf("Error -- no support for saving image file format.\n");
 		exit(1);

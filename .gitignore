@@ -1,2 +1,5 @@
-texgenpack.cpp
-build
+.git/*
+.idea/*
+build/*
+dist/*
+texgen.c

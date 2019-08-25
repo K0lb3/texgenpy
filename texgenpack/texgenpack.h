@@ -15,10 +15,6 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 */
-typedef __int32 int32_t;
-typedef unsigned __int32 uint32_t;
-typedef __int64 int64_t;
-typedef unsigned __int64 uint64_t;
 
 #define NU_FILE_TYPES		6
 
@@ -239,8 +235,6 @@ extern int option_perceptive;
 
 // Defined in image.c
 
-void convert_stexture_to_simage(const char *filename, int filetype, const char *dstname); 
-
 void load_image(const char *filename, int filetype, Image *image);
 int load_mipmap_images(const char *filename, int filetype, int max_images, Image *image);
 void save_image(Image *image, const char *filename, int filetype);
@@ -300,7 +294,8 @@ void save_png_file(Image *image, const char *filename);
 TextureInfo *match_texture_type(int type);
 TextureInfo *match_texture_description(const char *s);
 TextureInfo *match_ktx_id(int gl_internal_format, int gl_format, int gl_type);
-TextureInfo *match_dds_id(const char *four_cc, int dx10_format, uint32_t pixel_format_flags, int bitcount, uint32_t red_mask, uint32_t green_mask, uint32_t blue_mask, uint32_t alpha_mask);
+TextureInfo *match_dds_id(const char *four_cc, int dx10_format, uint32_t pixel_format_flags, int bitcount,
+uint32_t red_mask, uint32_t green_mask, uint32_t blue_mask, uint32_t alpha_mask);
 const char *texture_type_text(int texture_type);
 int get_number_of_texture_formats();
 const char *get_texture_format_index_text(int i, int j);
