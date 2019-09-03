@@ -1,6 +1,10 @@
 # texgen_py
 A cython wrapper for [texgenpack](https://github.com/hglm/texgenpack).
 
+Install via
+``python setup.py install``
+- Cython is required
+
 ## usage
 ```python
 from texgenpy import TexImage
