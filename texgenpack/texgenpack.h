@@ -341,3 +341,29 @@ int singles2halfp(void *target, void *source, int numel);
 
 void calibrate_genetic_parameters(Image *image, int texture_type);
 
+
+//#include <string.h> // memcpy
+
+typedef struct{
+    size_t ptr;
+    size_t len;
+    const char* data;
+} Buffer;
+
+static size_t bufread(void* dst, size_t i, size_t size, Buffer* src){
+	size_t max = src->len - src->ptr;
+	if (size > max) {
+		size = max;
+	}
+	memcpy(dst, src->data, size);
+	//src->data = static_cast<char*>(src->) + size;
+	src->data += size;
+	src->ptr += size;
+	return size;
+}
+
+void load_image_from_memory(Buffer *buf, int filetype, Image *image);
+void load_pkm_buffer(Buffer *f, Texture *texture);
+int load_ktx_buffer(Buffer *f, int max_mipmaps, Texture *texture);
+int load_dds_buffer(Buffer *f, int max_mipmaps, Texture *texture);
+void load_astc_buffer(Buffer *f, Texture *texture);
