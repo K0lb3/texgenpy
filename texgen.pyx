@@ -2,6 +2,7 @@ from PIL import Image as PILImage
 from texgen cimport *
 
 KNOWN_FILE_TYPES = {
+
     "PNG": 0x101,
     "PPM": 0x102,
     "KTX": 0x210,
@@ -13,19 +14,18 @@ KNOWN_FILE_TYPES = {
 cdef class TexImage:
     cdef Image image
 
-    def __init__(self, src, filetype = -1):
+    def __init__(self, src, filetype : str):
         """
         :param src: filepath or bytes
         :param filetype: PNG/KTX/PKM/DDS/ASTC, -1 = auto (filepath only)
         """
-        if isinstance(filetype, str):
-            filetype = KNOWN_FILE_TYPES.get(filetype.upper(), -1)
+        ft : int = KNOWN_FILE_TYPES.get(filetype.upper(), -1)
         if isinstance(src, str):
-            self.load_file(src, filetype)
+            self.load_file(src, ft)
         elif isinstance(src, bytes):
-            self.load_bytes(src, filetype)
+            self.load_bytes(src, ft)
 
-    def load_bytes(self, data : bytes, filetype : int = -1):
+    def load_bytes(self, data : bytes, filetype : int):
         cdef Buffer buf
         if filetype == -1:
             raise TypeError('The file type has to be set for bytes input.')
@@ -34,7 +34,7 @@ cdef class TexImage:
         buf.data = <unsigned char*> data
         load_image_from_memory(&buf, <int> filetype, &self.image)
 
-    def load_file(self, srcfile : str, filetype : int = -1):
+    def load_file(self, srcfile : str, filetype : int):
         if filetype == -1:
             filetype = KNOWN_FILE_TYPES.get(srcfile.rsplit('.')[1].upper(), 0x000)
         # convert filepath to const char
